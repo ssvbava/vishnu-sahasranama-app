@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, RotateCcw } from "lucide-react";
 
 interface AudioPlayerProps {
   audioUrl: string;
+  startTime?: number;
+  endTime?: number;
   shlokaNumber: number;
   onPrev?: () => void;
   onNext?: () => void;
@@ -13,6 +15,9 @@ interface AudioPlayerProps {
 }
 
 export default function AudioPlayer({
+  audioUrl,
+  startTime = 0,
+  endTime,
   shlokaNumber,
   onPrev,
   onNext,
@@ -23,78 +28,38 @@ export default function AudioPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
-  // Use a placeholder sine wave tone as demo audio
-  const generateToneUrl = useCallback(() => {
-    try {
-      const sampleRate = 44100;
-      const durationSec = 30;
-      const numSamples = sampleRate * durationSec;
-      const buffer = new ArrayBuffer(44 + numSamples * 2);
-      const view = new DataView(buffer);
-
-      // WAV header
-      const writeString = (offset: number, str: string) => {
-        for (let i = 0; i < str.length; i++) {
-          view.setUint8(offset + i, str.charCodeAt(i));
-        }
-      };
-
-      writeString(0, "RIFF");
-      view.setUint32(4, 36 + numSamples * 2, true);
-      writeString(8, "WAVE");
-      writeString(12, "fmt ");
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, 1, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * 2, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeString(36, "data");
-      view.setUint32(40, numSamples * 2, true);
-
-      // Generate a gentle OM-like tone with harmonics
-      const baseFreq = 136.1; // OM frequency
-      for (let i = 0; i < numSamples; i++) {
-        const t = i / sampleRate;
-        const envelope = Math.min(1, t * 2) * Math.min(1, (durationSec - t) * 2);
-        const sample =
-          envelope *
-          0.3 *
-          (Math.sin(2 * Math.PI * baseFreq * t) * 0.5 +
-            Math.sin(2 * Math.PI * baseFreq * 2 * t) * 0.25 +
-            Math.sin(2 * Math.PI * baseFreq * 3 * t) * 0.15 +
-            Math.sin(2 * Math.PI * baseFreq * 4 * t) * 0.1);
-        view.setInt16(44 + i * 2, sample * 32767, true);
-      }
-
-      const blob = new Blob([buffer], { type: "audio/wav" });
-      return URL.createObjectURL(blob);
-    } catch {
-      return "";
-    }
-  }, []);
-
+  // Load and handle source changes
   useEffect(() => {
-    const url = generateToneUrl();
-    if (url && audioRef.current) {
-      audioRef.current.src = url;
-      setIsLoaded(true);
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Only update source if it's actually different to avoid reloading large files
+    const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : window.location.origin + audioUrl;
+    if (audio.src !== fullAudioUrl) {
+      audio.src = audioUrl;
+      audio.load();
     }
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [shlokaNumber, generateToneUrl]);
+
+    // Seek to start time whenever shloka changes
+    audio.currentTime = startTime;
+    setCurrentTime(startTime);
+    
+    if (isPlaying) {
+      audio.play().catch(() => setIsPlaying(false));
+    }
+  }, [audioUrl, startTime, shlokaNumber]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateTime = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
     const updateDuration = () => setDuration(audio.duration);
     const handleEnd = () => setIsPlaying(false);
 
@@ -127,8 +92,8 @@ export default function AudioPlayer({
 
   const restart = () => {
     if (!audioRef.current) return;
-    audioRef.current.currentTime = 0;
-    setCurrentTime(0);
+    audioRef.current.currentTime = startTime;
+    setCurrentTime(startTime);
   };
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -136,32 +101,43 @@ export default function AudioPlayer({
     const rect = progressRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = x / rect.width;
-    audioRef.current.currentTime = percentage * duration;
+    
+    if (endTime && endTime > startTime) {
+        const segmentDuration = endTime - startTime;
+        audioRef.current.currentTime = startTime + (percentage * segmentDuration);
+    } else {
+        audioRef.current.currentTime = percentage * duration;
+    }
   };
 
   const formatTime = (time: number) => {
-    if (isNaN(time)) return "0:00";
-    const mins = Math.floor(time / 60);
-    const secs = Math.floor(time % 60);
-    return `\${mins}:\${secs.toString().padStart(2, "0")}`;
+    const relativeTime = time - startTime;
+    const displayTime = relativeTime > 0 ? relativeTime : 0;
+    const mins = Math.floor(displayTime / 60);
+    const secs = Math.floor(displayTime % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  let progress = 0;
+  if (endTime && endTime > startTime) {
+    progress = Math.min(100, Math.max(0, ((currentTime - startTime) / (endTime - startTime)) * 100));
+  } else if (duration > 0) {
+    progress = (currentTime / duration) * 100;
+  }
 
   return (
     <div className="bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-700/30 rounded-2xl p-4 sm:p-5 backdrop-blur-sm">
-      <audio ref={audioRef} preload="metadata" />
+      <audio ref={audioRef} preload="auto" />
 
       <div className="flex items-center justify-between mb-3">
         <span className="text-amber-400/70 text-xs font-medium tracking-wider uppercase">
-          {isLoaded ? "Chanting Audio" : "Loading Audio..."}
+          MS Subbulakshmi Chanting
         </span>
         <span className="text-amber-400/50 text-xs">
           Shloka {shlokaNumber}
         </span>
       </div>
 
-      {/* Progress Bar */}
       <div
         ref={progressRef}
         className="w-full h-2 bg-amber-950/50 rounded-full cursor-pointer mb-3 group"
@@ -169,19 +145,17 @@ export default function AudioPlayer({
       >
         <div
           className="h-full bg-gradient-to-r from-amber-500 to-orange-400 rounded-full relative transition-all duration-100"
-          style={{ width: `\${progress}%` }}
+          style={{ width: `${progress}%` }}
         >
           <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-amber-400 rounded-full shadow-lg shadow-amber-500/50 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       </div>
 
-      {/* Time Display */}
       <div className="flex justify-between text-xs text-amber-400/50 mb-4">
         <span>{formatTime(currentTime)}</span>
-        <span>{formatTime(duration)}</span>
+        <span>{endTime ? formatTime(endTime) : "..."}</span>
       </div>
 
-      {/* Controls */}
       <div className="flex items-center justify-center gap-3 sm:gap-5">
         <button
           onClick={toggleMute}
@@ -192,10 +166,7 @@ export default function AudioPlayer({
         </button>
 
         <button
-          onClick={() => {
-            setIsPlaying(false);
-            onPrev?.();
-          }}
+          onClick={() => onPrev?.()}
           disabled={!hasPrev}
           className="p-2 text-amber-400/60 hover:text-amber-300 disabled:text-amber-900/50 disabled:cursor-not-allowed transition-colors"
           aria-label="Previous shloka"
@@ -216,10 +187,7 @@ export default function AudioPlayer({
         </button>
 
         <button
-          onClick={() => {
-            setIsPlaying(false);
-            onNext?.();
-          }}
+          onClick={() => onNext?.()}
           disabled={!hasNext}
           className="p-2 text-amber-400/60 hover:text-amber-300 disabled:text-amber-900/50 disabled:cursor-not-allowed transition-colors"
           aria-label="Next shloka"

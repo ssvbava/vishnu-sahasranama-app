@@ -92,44 +92,25 @@ export default function Home() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation, showList]);
 
   const namesCompleted = currentShloka
     ? currentShloka.names[currentShloka.names.length - 1]?.number || 0
     : 0;
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-400 mb-4">{error}</p>
-          <button
-            onClick={() => fetchShloka(1)}
-            className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
-      {/* Decorative Background */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-amber-600/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-1/4 w-[400px] h-[400px] bg-orange-600/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative max-w-2xl mx-auto px-4 py-6 sm:py-10">
-        {/* Header */}
         <header className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-900/20 border border-amber-700/20 mb-4">
             <Sparkles size={14} className="text-amber-400" />
             <span className="text-amber-400/80 text-xs font-medium tracking-wider uppercase">
-              Sacred Chant
+              MS Subbulakshmi Chanting
             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-amber-200 via-amber-100 to-orange-200 bg-clip-text text-transparent mb-2">
@@ -138,13 +119,8 @@ export default function Home() {
           <h2 className="text-lg sm:text-xl text-amber-200/70 font-light">
             Vishnu Sahasranama
           </h2>
-          <p className="text-slate-400 text-sm mt-2 max-w-md mx-auto">
-            The Thousand Names of Lord Vishnu from the Anushasana Parva of the
-            Mahabharata
-          </p>
         </header>
 
-        {/* Progress */}
         {navigation && metadata && (
           <div className="mb-6">
             <ProgressBar
@@ -156,16 +132,13 @@ export default function Home() {
           </div>
         )}
 
-        {/* Main Content */}
         {loading && !currentShloka ? (
           <div className="space-y-6">
             <div className="animate-pulse bg-slate-800/40 rounded-2xl h-40" />
             <div className="animate-pulse bg-slate-800/40 rounded-2xl h-32" />
-            <div className="animate-pulse bg-slate-800/40 rounded-2xl h-60" />
           </div>
         ) : currentShloka ? (
           <div className="space-y-6">
-            {/* Shloka Number Badge */}
             <div className="flex items-center gap-3 mb-2">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-900/20 border border-amber-700/20">
                 <BookOpen size={14} className="text-amber-400" />
@@ -173,18 +146,14 @@ export default function Home() {
                   Shloka {currentShloka.number}
                 </span>
               </div>
-              <span className="text-slate-500 text-xs">
-                Names {currentShloka.names[0]?.number} —{" "}
-                {currentShloka.names[currentShloka.names.length - 1]?.number}
-              </span>
             </div>
 
-            {/* Shloka Content */}
             <ShlokaDisplay shloka={currentShloka} />
 
-            {/* Audio Player */}
             <AudioPlayer
               audioUrl={currentShloka.audioUrl}
+              startTime={currentShloka.startTime}
+              endTime={currentShloka.endTime}
               shlokaNumber={currentShloka.number}
               onPrev={goToPrev}
               onNext={goToNext}
@@ -192,7 +161,6 @@ export default function Home() {
               hasNext={!!navigation?.next}
             />
 
-            {/* Navigation */}
             {navigation && (
               <NavigationBar
                 onPrev={goToPrev}
@@ -207,18 +175,13 @@ export default function Home() {
           </div>
         ) : null}
 
-        {/* Footer */}
         <footer className="mt-12 pb-8 text-center border-t border-slate-800/40 pt-6">
-          <p className="text-slate-500 text-xs">
+          <p className="text-slate-500 text-xs uppercase tracking-widest">
             ॐ नमो भगवते वासुदेवाय
-          </p>
-          <p className="text-slate-600 text-xs mt-1">
-            Om Namo Bhagavate Vasudevaya
           </p>
         </footer>
       </div>
 
-      {/* Shloka List Modal */}
       {showList && (
         <ShlokaList
           shlokas={allShlokas}
