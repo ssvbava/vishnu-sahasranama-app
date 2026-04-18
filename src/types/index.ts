@@ -12,6 +12,8 @@ export interface Shloka {
   transliteration: string;
   names: Name[];
   audioUrl: string;
+  startTime?: number; // Start time in seconds
+  endTime?: number;   // End time in seconds
 }
 
 export interface Metadata {
@@ -21,6 +23,7 @@ export interface Metadata {
   totalShlokas: number;
   totalNames: number;
   description: string;
+  audioSource?: string;
 }
 
 export interface ShlokaData {
